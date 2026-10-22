@@ -1,0 +1,18 @@
+name: ouida-mcp
+
+services:
+  ouida-mcp:
+    build: ./mcp
+    container_name: ouida-mcp
+    restart: unless-stopped
+    env_file: ./mcp/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8020
+    ports:
+      - "127.0.0.1:8020:8020"
+    networks: [web]
+
+networks:
+  web:
+    external: true
