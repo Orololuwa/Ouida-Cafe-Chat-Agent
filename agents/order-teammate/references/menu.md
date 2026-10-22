@@ -1,6 +1,8 @@
 # Ouida Café menu
 
-Prices in naira. Use only these items and prices.
+> Reference only. Prices and availability come from `get_menu`, which always wins.
+
+Prices in naira.
 
 ## Plates
 

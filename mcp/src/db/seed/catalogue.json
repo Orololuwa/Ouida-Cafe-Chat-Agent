@@ -1,0 +1,39 @@
+[
+  { "id": "dundu-egg-sauce", "name": "Dundu and Egg Sauce", "category": "food", "price_ngn": 3000, "on_plate": true, "description": "Fried yam strips with egg sauce" },
+  { "id": "akara", "name": "Akara", "category": "food", "price_ngn": 2000, "on_plate": true, "description": "Fried bean balls with pepper and onion" },
+  { "id": "dodo", "name": "Dodo", "category": "food", "price_ngn": 1000, "on_plate": true, "description": "Fried ripe plantain" },
+  { "id": "dodo-egg-sauce", "name": "Dodo and Egg Sauce", "category": "food", "price_ngn": 3000, "on_plate": true, "description": "Fried plantain with egg sauce" },
+  { "id": "catfish-pepper-soup", "name": "Catfish Pepper Soup", "category": "food", "price_ngn": 2500, "on_plate": true, "description": "Catfish broth with basil and Nigerian herbs" },
+  { "id": "rice-pepper-sauce-beef", "name": "Rice and Pepper Sauce (Beef)", "category": "food", "price_ngn": 3000, "on_plate": true, "description": "Short-grain rice, pepper sauce, stewed beef" },
+  { "id": "rice-pepper-sauce-chicken", "name": "Rice and Pepper Sauce (Chicken)", "category": "food", "price_ngn": 4500, "on_plate": true, "description": "Short-grain rice, pepper sauce, chicken" },
+  { "id": "asun", "name": "Asun", "category": "food", "price_ngn": 3000, "on_plate": true, "description": "Spicy goat meat in scotch bonnet sauce" },
+  { "id": "yam-potato-porridge", "name": "Yam and Sweet Potato Porridge", "category": "food", "price_ngn": 2000, "on_plate": true, "description": "With local fish and vegetables" },
+  { "id": "jollof-turkey", "name": "Jollof Rice with Turkey", "category": "food", "price_ngn": 7000, "on_plate": true, "description": "Smoky jollof with fried turkey" },
+  { "id": "jollof-beef", "name": "Jollof Rice with Beef", "category": "food", "price_ngn": 3000, "on_plate": true, "description": "Smoky jollof with stewed fried beef" },
+  { "id": "jollof-chicken", "name": "Jollof Rice with Chicken", "category": "food", "price_ngn": 4500, "on_plate": true, "description": "Smoky jollof with fried chicken" },
+  { "id": "jollof-spaghetti", "name": "Jollof Spaghetti", "category": "food", "price_ngn": 1500, "on_plate": true, "description": "Spaghetti in spicy tomato sauce" },
+
+  { "id": "extra-beef", "name": "Extra beef (4 pieces)", "category": "protein", "price_ngn": 1500, "on_plate": true },
+  { "id": "extra-chicken", "name": "Extra chicken", "category": "protein", "price_ngn": 3500, "on_plate": true },
+  { "id": "extra-turkey", "name": "Extra turkey", "category": "protein", "price_ngn": 5000, "on_plate": true },
+  { "id": "extra-mackerel", "name": "Extra mackerel (Titus)", "category": "protein", "price_ngn": 1500, "on_plate": true },
+  { "id": "extra-panla", "name": "Extra panla fish (1 fish)", "category": "protein", "price_ngn": 1500, "on_plate": true },
+  { "id": "boiled-egg", "name": "Boiled egg", "category": "protein", "price_ngn": 500, "on_plate": true },
+
+  { "id": "puff-puff", "name": "Puff-puff (sweet)", "category": "sweet", "price_ngn": 2000, "on_plate": true, "prep_note": "Takes about 30 minutes" },
+  { "id": "pepper-puff-puff", "name": "Pepper puff-puff (14 pieces)", "category": "sweet", "price_ngn": 2300, "on_plate": true, "description": "With onions and scotch bonnet", "prep_note": "Takes about 30 minutes" },
+
+  { "id": "espresso", "name": "Espresso", "category": "hot_drink", "price_ngn": 3000, "on_plate": false },
+  { "id": "americano", "name": "Americano", "category": "hot_drink", "price_ngn": 3000, "on_plate": false },
+  { "id": "latte", "name": "Latte", "category": "hot_drink", "price_ngn": 4000, "on_plate": false },
+  { "id": "iced-latte", "name": "Iced latte", "category": "hot_drink", "price_ngn": 4500, "on_plate": false },
+  { "id": "cappuccino", "name": "Cappuccino", "category": "hot_drink", "price_ngn": 4000, "on_plate": false },
+  { "id": "mocha", "name": "Mocha", "category": "hot_drink", "price_ngn": 4000, "on_plate": false },
+  { "id": "tea", "name": "Tea (green, black or flavoured)", "category": "hot_drink", "price_ngn": 3000, "on_plate": false },
+
+  { "id": "zobo-glass", "name": "Zobo (glass)", "category": "drink", "price_ngn": 1000, "on_plate": false },
+  { "id": "zobo-jug", "name": "Zobo (jug)", "category": "drink", "price_ngn": 5000, "on_plate": false },
+  { "id": "water-small", "name": "Water (small bottle)", "category": "drink", "price_ngn": 500, "on_plate": false },
+  { "id": "water-big", "name": "Water (big bottle)", "category": "drink", "price_ngn": 1000, "on_plate": false },
+  { "id": "soft-drink", "name": "Soft or energy drink", "category": "drink", "price_ngn": 800, "on_plate": false, "description": "Coke, Fanta, Sprite, Pepsi, Maltina, Predator or Fearless. Put the brand in the line's note" }
+]

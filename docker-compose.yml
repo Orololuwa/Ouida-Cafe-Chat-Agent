@@ -9,6 +9,10 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8020
+      DB_PATH: /data/ouida.db
+    volumes:
+      # SQLite catalogue and orders. Must be writable by the container's node user (UID 1000).
+      - ./data:/data
     ports:
       - "127.0.0.1:8020:8020"
     networks: [web]
