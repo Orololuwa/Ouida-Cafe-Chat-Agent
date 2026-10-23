@@ -177,6 +177,16 @@ test("notes and drink-only orders render on the receipt", () => {
   assert.equal(getOrder(db, r.order_ref)!.customer_handle, "partner_abc");
 });
 
+test('Labels that only say "Plate N" are dropped from the receipt', () => {
+  const db = openDatabase(":memory:");
+  const r = created(db, {
+    customer_name: "Adamu",
+    plates: [{ label: "Plate 1", items: [one("asun")] }, { label: "Ada", items: [one("asun")] }],
+  });
+  assert.match(r.receipt_text, /\n\*Plate 1\*\n.*\n\*Plate 2 \(Ada\)\*\n/);
+  assert.equal(r.plates[0].label, undefined);
+});
+
 test("create_order reports menu_not_set when the catalogue is empty", () => {
   const db = openDatabase(":memory:");
   db.exec("DELETE FROM catalogue");

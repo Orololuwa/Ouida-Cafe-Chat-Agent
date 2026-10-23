@@ -8,8 +8,8 @@ import { jsonResult, systemError } from "../result.js";
 // problem comes back in one result with a status code, rather than as a schema error.
 // Optional fields are .nullish(): agents often send null for a field they aren't using.
 const line = z.object({
-  item_id: z.string().describe("An id from get_menu"),
-  qty: z.number().describe(`Whole number from ${LIMITS.qtyMin} to ${LIMITS.qtyMax}`),
+  item_id: z.string().describe("The item's `id` from get_menu, e.g. jollof-chicken. The field is named item_id here, not id"),
+  qty: z.number().describe(`How many: a whole number from ${LIMITS.qtyMin} to ${LIMITS.qtyMax}. The field is named qty, not quantity`),
   note: z
     .string()
     .nullish()
@@ -25,7 +25,7 @@ const inputSchema = {
   plates: z
     .array(
       z.object({
-        label: z.string().nullish().describe("Whose plate this is, e.g. Ada"),
+        label: z.string().nullish().describe("Whose plate this is, e.g. Ada. Leave it out unless the plate is for a named person"),
         items: z.array(line).describe("Food, protein and sweet items on this plate"),
       }),
     )

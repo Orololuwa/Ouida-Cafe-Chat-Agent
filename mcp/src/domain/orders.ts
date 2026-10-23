@@ -177,7 +177,9 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
       problems.push({ code: "invalid_order", plate: plateNo, message: `Plate ${plateNo} has no items.` });
     }
     const lines = items.map((l) => priceLine(l, plateNo)).filter((l): l is OrderLine => l !== null);
-    const label = p.label?.trim() || undefined;
+    // "Plate 2" says nothing the receipt doesn't already say, so only real names are kept.
+    const rawLabel = p.label?.trim();
+    const label = rawLabel && !/^plate\s*\d*$/i.test(rawLabel) ? rawLabel : undefined;
     return {
       ...(label ? { label } : {}),
       lines,
