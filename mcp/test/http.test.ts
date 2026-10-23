@@ -96,6 +96,19 @@ test("Optional fields sent as null are treated as not given", async () => {
   assert.equal(link.payload.status, "link_ready");
   assert.equal(link.payload.paystack_ref, `${ref}-1`);
 
+  // The exact shape agents sent in production: get_menu's `id` and `quantity` instead of item_id and qty.
+  const aliased = await callTool("create_order", {
+    customer_name: "bola",
+    plates: [
+      { label: "Plate 1", items: [{ id: "asun", quantity: 1 }] },
+      { label: "Plate 2", items: [{ id: "asun", quantity: 1 }] },
+    ],
+    drinks: [],
+  });
+  assert.ok(!aliased.isError, String(aliased.payload));
+  assert.ok(typeof aliased.payload === "object");
+  assert.equal(aliased.payload.total_ngn, 6400);
+
   // A reference wrapped in WhatsApp bold or a sentence still finds the order.
   for (const wrapped of [`*${ref}*`, `Order ${ref}`, ref.toLowerCase()]) {
     const r = await callTool("verify_payment", { order_ref: wrapped });

@@ -7,14 +7,22 @@ import { jsonResult, systemError } from "../result.js";
 // The schema only fixes the shape. Ranges and lengths are checked in createOrder so that every
 // problem comes back in one result with a status code, rather than as a schema error.
 // Optional fields are .nullish(): agents often send null for a field they aren't using.
-const line = z.object({
-  item_id: z.string().describe("The item's `id` from get_menu, e.g. jollof-chicken. The field is named item_id here, not id"),
-  qty: z.number().describe(`How many: a whole number from ${LIMITS.qtyMin} to ${LIMITS.qtyMax}. The field is named qty, not quantity`),
+const lineShape = z.object({
+  item_id: z.string().describe("The item's `id` from get_menu, e.g. jollof-chicken"),
+  qty: z.number().describe(`How many: a whole number from ${LIMITS.qtyMin} to ${LIMITS.qtyMax}`),
   note: z
     .string()
     .nullish()
     .describe(`Optional brand choice or kitchen request, max ${LIMITS.noteMax} characters`),
 });
+
+// Agents copy get_menu's field names and send { id, quantity }. Accept those as aliases.
+// The advertised schema still shows only item_id and qty.
+const line = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const { id, quantity, ...rest } = value as Record<string, unknown>;
+  return { ...rest, item_id: rest.item_id ?? id, qty: rest.qty ?? quantity };
+}, lineShape);
 
 const inputSchema = {
   customer_name: z.string().describe(`Name on the order, 1–${LIMITS.nameMax} characters`),
