@@ -33,9 +33,33 @@ const SCHEMA = `
     plate_count     INTEGER NOT NULL,
     plate_fee_ngn   INTEGER NOT NULL,
     total_ngn       INTEGER NOT NULL,
-    created_at      TEXT NOT NULL
+    created_at      TEXT NOT NULL,
+    paid_at         TEXT,
+    paid_reference  TEXT
+  );
+
+  -- One row per Paystack transaction. Never deleted, so this is each order's payment history.
+  CREATE TABLE IF NOT EXISTS payment_attempts (
+    paystack_ref      TEXT PRIMARY KEY,
+    order_ref         TEXT NOT NULL REFERENCES orders (ref),
+    attempt_no        INTEGER NOT NULL,
+    amount_kobo       INTEGER NOT NULL,
+    email             TEXT NOT NULL,
+    authorization_url TEXT,
+    status            TEXT NOT NULL,
+    gateway_response  TEXT,
+    created_at        TEXT NOT NULL,
+    checked_at        TEXT,
+    UNIQUE (order_ref, attempt_no)
   );
 `;
+
+// Columns added after the first release (also listed in SCHEMA for new databases). Added on
+// startup if missing, so an existing database upgrades in place with its data intact.
+const ADDED_COLUMNS: { table: string; column: string; definition: string }[] = [
+  { table: "orders", column: "paid_at", definition: "TEXT" },
+  { table: "orders", column: "paid_reference", definition: "TEXT" },
+];
 
 const DEFAULT_SETTINGS: Record<string, string> = {
   plate_fee_ngn: "200",
@@ -50,8 +74,19 @@ export function openDatabase(path: string): Database {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
+  migrate(db);
   seed(db);
   return db;
+}
+
+function migrate(db: Database): void {
+  for (const { table, column, definition } of ADDED_COLUMNS) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      console.log(`[db] added ${table}.${column}`);
+    }
+  }
 }
 
 // Seeds the catalogue only when it is empty, so owner edits survive restarts.

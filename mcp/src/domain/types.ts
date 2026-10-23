@@ -19,7 +19,7 @@ export interface Settings {
   currency: string;
 }
 
-export type OrderStatus = "pending_payment";
+export type OrderStatus = "pending_payment" | "paid";
 
 export interface OrderLine {
   item_id: string;
@@ -47,4 +47,21 @@ export interface Order {
   plate_fee_ngn: number; // snapshot
   total_ngn: number;
   created_at: string;
+  paid_at?: string; // set once, when verified
+  paid_reference?: string; // the payment attempt that paid
+}
+
+// One Paystack transaction for an order. `status` is "initialized" when created,
+// "init_failed" if Paystack never gave us a link, then Paystack's last reported status.
+export interface PaymentAttempt {
+  paystack_ref: string; // e.g. OU-7KQ3-2
+  order_ref: string;
+  attempt_no: number;
+  amount_kobo: number;
+  email: string;
+  authorization_url?: string;
+  status: string;
+  gateway_response?: string;
+  created_at: string;
+  checked_at?: string;
 }

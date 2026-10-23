@@ -1,10 +1,11 @@
 import express, { type Express, type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { Database } from "../db/index.js";
+import type { AppDeps } from "../deps.js";
 import { buildServer } from "../mcp/server.js";
 import { requireBearer } from "./auth.js";
+import { paidPage } from "./paid-page.js";
 
-export function createApp({ db, mcpToken }: { db: Database; mcpToken: string }): Express {
+export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Express {
   const app = express();
   app.set("trust proxy", ["loopback", "uniquelocal"]); // behind Caddy: log the caller's real IP
   app.use(express.json({ limit: "1mb" }));
@@ -16,8 +17,11 @@ export function createApp({ db, mcpToken }: { db: Database; mcpToken: string }):
     res.json({ ok: true, service: "ouida-mcp", time: new Date().toISOString() });
   });
 
+  // Public: Paystack returns the customer here after checkout. See paid-page.ts.
+  app.get("/paid", paidPage(deps));
+
   app.post("/mcp", auth, async (req, res) => {
-    const server = buildServer(db);
+    const server = buildServer(deps);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
       enableJsonResponse: true, // plain JSON replies, so no streaming through proxies

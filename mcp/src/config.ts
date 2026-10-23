@@ -5,13 +5,33 @@ export interface Config {
   host: string;
   mcpToken: string;
   dbPath: string;
+  paystackSecretKey: string;
+  publicBaseUrl: string; // no trailing slash
+  paymentEmailDomain: string;
 }
+
+export class ConfigError extends Error {}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const mcpToken = env.MCP_TOKEN;
   if (!mcpToken || mcpToken.length < 32) {
-    console.error("MCP_TOKEN is missing or shorter than 32 characters. Set it in .env.");
-    process.exit(1);
+    throw new ConfigError("MCP_TOKEN is missing or shorter than 32 characters. Set it in .env.");
+  }
+
+  // Test mode only in v1: refuse anything that isn't a Paystack test key.
+  const paystackSecretKey = env.PAYSTACK_SECRET_KEY ?? "";
+  if (!paystackSecretKey.startsWith("sk_test_")) {
+    throw new ConfigError("PAYSTACK_SECRET_KEY must be a Paystack test key (sk_test_…). Live keys are not allowed yet.");
+  }
+
+  const publicBaseUrl = (env.PUBLIC_BASE_URL ?? "").replace(/\/+$/, "");
+  if (!/^https?:\/\/[^/\s]+$/.test(publicBaseUrl)) {
+    throw new ConfigError("PUBLIC_BASE_URL must be an origin like https://ouida-mcp.eleven-sports.app (no path).");
+  }
+
+  const paymentEmailDomain = env.PAYMENT_EMAIL_DOMAIN ?? "";
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(paymentEmailDomain)) {
+    throw new ConfigError("PAYMENT_EMAIL_DOMAIN must be a domain like orders.eleven-sports.app.");
   }
 
   return {
@@ -21,5 +41,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mcpToken,
     // Docker sets DB_PATH=/data/ouida.db on a mounted volume; locally it lands in ./data.
     dbPath: env.DB_PATH ?? "data/ouida.db",
+    paystackSecretKey,
+    publicBaseUrl,
+    paymentEmailDomain,
   };
 }

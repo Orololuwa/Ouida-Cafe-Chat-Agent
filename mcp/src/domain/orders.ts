@@ -260,6 +260,8 @@ interface OrderRow {
   plate_fee_ngn: number;
   total_ngn: number;
   created_at: string;
+  paid_at: string | null;
+  paid_reference: string | null;
 }
 
 export function getOrder(db: Database, ref: string): Order | undefined {
@@ -276,5 +278,7 @@ export function getOrder(db: Database, ref: string): Order | undefined {
     plate_fee_ngn: row.plate_fee_ngn,
     total_ngn: row.total_ngn,
     created_at: row.created_at,
+    ...(row.paid_at ? { paid_at: row.paid_at } : {}),
+    ...(row.paid_reference ? { paid_reference: row.paid_reference } : {}),
   };
 }
