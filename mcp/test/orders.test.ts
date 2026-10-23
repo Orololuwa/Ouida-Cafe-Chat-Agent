@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { openDatabase, type Database } from "../src/db/index.js";
-import { createOrder, generateRef, getOrder, type CreateOrderInput } from "../src/domain/orders.js";
+import { createOrder, DUPLICATE_WINDOW_MS, generateRef, getOrder, type CreateOrderInput } from "../src/domain/orders.js";
 
 const one = (item_id: string, qty = 1) => ({ item_id, qty });
 const orderCount = (db: Database) => (db.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number }).n;
@@ -123,7 +123,7 @@ test("9. A later price change never alters a saved order", () => {
   assert.equal(saved.total_ngn, 4700);
 
   // New orders pick up the new price.
-  assert.equal(created(db, { customer_name: "Ororo", plates: [{ items: [one("jollof-chicken")] }] }).total_ngn, 5200);
+  assert.equal(created(db, { customer_name: "Ade", plates: [{ items: [one("jollof-chicken")] }] }).total_ngn, 5200);
 });
 
 test("every problem is reported in one result, in order", () => {
@@ -213,4 +213,28 @@ test("10 (local). Orders and owner edits survive reopening the database file", (
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("Creating the same unpaid order again returns the existing one instead of a duplicate", () => {
+  const db = openDatabase(":memory:");
+  const input = { customer_name: "Jubril", plates: [{ items: [one("catfish-pepper-soup")] }, { items: [one("catfish-pepper-soup")] }] };
+  const t0 = new Date("2026-10-23T19:49:00Z");
+  const first = createOrder(db, input, t0);
+  assert.equal(first.status, "order_created");
+  if (first.status !== "order_created") return;
+
+  const again = createOrder(db, { ...input, customer_name: "jubril " }, new Date(t0.getTime() + 60_000));
+  assert.equal(again.status, "order_already_created");
+  if (again.status !== "order_already_created") return;
+  assert.equal(again.order_ref, first.order_ref);
+  assert.equal(again.receipt_text, first.receipt_text);
+  assert.match(again.next_step!, new RegExp(`call create_payment_link with order_ref ${first.order_ref}`));
+  assert.equal(orderCount(db), 1);
+
+  // A changed order, a different customer, or a paid or old order is created as new.
+  assert.equal(createOrder(db, { ...input, plates: [input.plates[0]] }, t0).status, "order_created");
+  assert.equal(createOrder(db, { ...input, customer_name: "Ade" }, t0).status, "order_created");
+  assert.equal(createOrder(db, input, new Date(t0.getTime() + DUPLICATE_WINDOW_MS + 1000)).status, "order_created");
+  db.prepare("UPDATE orders SET status = 'paid'").run();
+  assert.equal(createOrder(db, input, new Date(t0.getTime() + 120_000)).status, "order_created");
 });

@@ -34,7 +34,8 @@ export interface Problem {
 
 export type CreateOrderResult =
   | {
-      status: "order_created";
+      // order_already_created: the same unpaid order already exists, so it is returned instead of a duplicate.
+      status: "order_created" | "order_already_created";
       order_ref: string;
       customer_name: string;
       plate_count: number;
@@ -44,6 +45,7 @@ export type CreateOrderResult =
       plates: Plate[];
       drinks: OrderLine[];
       receipt_text: string;
+      next_step?: string;
     }
   | { status: "menu_not_set" }
   | { status: ProblemCode; problems: Problem[] };
@@ -60,6 +62,10 @@ export const LIMITS = {
 const REF_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const REF_LENGTH = 4;
 const REF_ATTEMPTS = 20;
+
+// Agents sometimes call create_order again when the customer says "yes" to a receipt.
+// An identical unpaid order for the same name within this window is returned instead of duplicated.
+export const DUPLICATE_WINDOW_MS = 30 * 60 * 1000;
 
 export function generateRef(): string {
   let ref = "OU-";
@@ -209,6 +215,27 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
     total_ngn: total,
     created_at: now.toISOString(),
   };
+  const existing = findDuplicate(db, order, now);
+  if (existing) {
+    console.log(`[orders] ${existing.ref} already exists for ${existing.customer_name}; not creating a duplicate`);
+    return {
+      status: "order_already_created",
+      order_ref: existing.ref,
+      customer_name: existing.customer_name,
+      plate_count: existing.plate_count,
+      plate_fee_ngn: existing.plate_fee_ngn,
+      total_ngn: existing.total_ngn,
+      order_status: existing.status,
+      plates: existing.plates,
+      drinks: existing.drinks,
+      receipt_text: renderReceipt(existing),
+      next_step:
+        `This exact order already exists as ${existing.ref} and the customer has seen its receipt. ` +
+        `If the customer has just confirmed it, call create_payment_link with order_ref ${existing.ref} now. ` +
+        `Do not call create_order again unless the customer changes the order.`,
+    };
+  }
+
   order.ref = saveOrder(db, order);
 
   return {
@@ -223,6 +250,33 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
     drinks: order.drinks,
     receipt_text: renderReceipt(order),
   };
+}
+
+// What makes two orders "the same": every plate (label and lines) and every drink, in order.
+function orderContent(o: Pick<Order, "plates" | "drinks">): string {
+  const line = (l: OrderLine) => [l.item_id, l.qty, l.note ?? ""];
+  return JSON.stringify({
+    plates: o.plates.map((p) => [p.label ?? "", p.lines.map(line)]),
+    drinks: o.drinks.map(line),
+  });
+}
+
+// The most recent unpaid order with the same name and contents, created within the window.
+function findDuplicate(db: Database, order: Omit<Order, "ref">, now: Date): Order | undefined {
+  const since = new Date(now.getTime() - DUPLICATE_WINDOW_MS).toISOString();
+  const refs = db
+    .prepare(
+      `SELECT ref FROM orders
+       WHERE status = 'pending_payment' AND customer_name = ? COLLATE NOCASE AND created_at >= ?
+       ORDER BY created_at DESC LIMIT 20`,
+    )
+    .all(order.customer_name, since) as { ref: string }[];
+  const wanted = orderContent(order);
+  for (const { ref } of refs) {
+    const candidate = getOrder(db, ref);
+    if (candidate && orderContent(candidate) === wanted) return candidate;
+  }
+  return undefined;
 }
 
 // Inserts the order under a fresh random reference, regenerating on the rare collision.

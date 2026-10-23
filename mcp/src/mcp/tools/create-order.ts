@@ -48,7 +48,7 @@ export function registerCreateOrder(server: McpServer, db: Database): void {
     {
       title: "Create order",
       description:
-        "Creates a lunch order and calculates its total. Pass the customer's name, each plate's items (ids from get_menu and quantities) and any drinks. Never pass prices: the server prices everything. Returns an order reference and a receipt to send to the customer as written, or a status explaining what needs fixing.",
+        "Creates a lunch order and calculates its total. Pass the customer's name, each plate's items (ids from get_menu and quantities) and any drinks. Never pass prices: the server prices everything. Returns an order reference and a receipt to send to the customer as written, or a status explaining what needs fixing. Call this once per order, before the customer confirms. When the customer confirms, call create_payment_link instead: never create_order again unless the order changed.",
       inputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
@@ -56,7 +56,7 @@ export function registerCreateOrder(server: McpServer, db: Database): void {
       try {
         const result = createOrder(db, input);
         console.log(
-          result.status === "order_created"
+          result.status === "order_created" || result.status === "order_already_created"
             ? `[tool] create_order -> ${result.status} ${result.order_ref} (plates: ${result.plate_count}, total: ₦${result.total_ngn})`
             : `[tool] create_order -> ${result.status}`,
         );
