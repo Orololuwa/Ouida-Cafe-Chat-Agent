@@ -60,6 +60,51 @@ test("/mcp still needs the bearer token; /paid does not", async () => {
   assert.equal((await fetch(`${base}/mcp`, { method: "POST" })).status, 401);
 });
 
+// Calls a tool through the real MCP endpoint, so the SDK's schema validation runs too.
+async function callTool(name: string, args: unknown): Promise<{ isError?: boolean; payload: Record<string, unknown> | string }> {
+  const res = await fetch(`${base}/mcp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-06-18",
+      Authorization: `Bearer ${"t".repeat(32)}`,
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
+  });
+  const { result } = (await res.json()) as { result: { isError?: boolean; content: { text: string }[] } };
+  const text = result.content[0].text;
+  return { isError: result.isError, payload: result.isError ? text : JSON.parse(text) };
+}
+
+test("Optional fields sent as null are treated as not given", async () => {
+  const order = await callTool("create_order", {
+    customer_name: "Feyi",
+    customer_handle: null,
+    plates: [{ label: null, items: [{ item_id: "catfish-pepper-soup", qty: 1, note: null }] }],
+    drinks: null,
+  });
+  assert.ok(!order.isError, String(order.payload));
+  assert.ok(typeof order.payload === "object");
+  assert.equal(order.payload.status, "order_created");
+  assert.equal(order.payload.total_ngn, 2700);
+  const ref = order.payload.order_ref as string;
+
+  const link = await callTool("create_payment_link", { order_ref: ref, new_link: null });
+  assert.ok(!link.isError, String(link.payload));
+  assert.ok(typeof link.payload === "object");
+  assert.equal(link.payload.status, "link_ready");
+  assert.equal(link.payload.paystack_ref, `${ref}-1`);
+
+  // A reference wrapped in WhatsApp bold or a sentence still finds the order.
+  for (const wrapped of [`*${ref}*`, `Order ${ref}`, ref.toLowerCase()]) {
+    const r = await callTool("verify_payment", { order_ref: wrapped });
+    assert.ok(typeof r.payload === "object");
+    assert.equal(r.payload.status, "payment_not_completed", wrapped);
+    assert.equal(r.payload.order_ref, ref);
+  }
+});
+
 // ---------- the real Paystack client, against a local stand-in for api.paystack.co ----------
 
 test("Paystack client sends the documented fields and reads data.status", async () => {

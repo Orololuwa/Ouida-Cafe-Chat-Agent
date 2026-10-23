@@ -15,7 +15,7 @@ export function registerCreatePaymentLink(server: McpServer, deps: AppDeps): voi
         order_ref: z.string().describe("The order reference from create_order, e.g. OU-7KQ3"),
         new_link: z
           .boolean()
-          .optional()
+          .nullish() // agents often send null for a field they aren't using
           .describe("true only if the customer says the previous link failed or didn't work"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

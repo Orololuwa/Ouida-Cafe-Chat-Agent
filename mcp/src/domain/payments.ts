@@ -121,7 +121,11 @@ function linkAttempts(db: Database, orderRef: string): (PaymentAttempt & { autho
 }
 
 const iso = (deps: AppDeps) => (deps.now?.() ?? new Date()).toISOString();
-const normalizeRef = (ref: string) => ref.trim().toUpperCase();
+// Accepts the reference however the agent wraps it ("ou-8r9a", "*OU-8R9A*", "Order OU-8R9A").
+const normalizeRef = (ref: string) => {
+  const upper = ref.trim().toUpperCase();
+  return upper.match(/\bOU-[A-Z0-9]{4}\b/)?.[0] ?? upper;
+};
 
 // ---------- checking one attempt with Paystack ----------
 
@@ -187,7 +191,7 @@ async function checkAttempt(deps: AppDeps, order: Order, attempt: PaymentAttempt
 
 export async function createPaymentLink(
   deps: AppDeps,
-  input: { order_ref: string; new_link?: boolean },
+  input: { order_ref: string; new_link?: boolean | null },
 ): Promise<CreatePaymentLinkResult> {
   const { db } = deps;
   const orderRef = normalizeRef(input.order_ref);

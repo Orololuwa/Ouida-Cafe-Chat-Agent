@@ -6,20 +6,21 @@ import type { CatalogueItem, Order, OrderLine, Plate } from "./types.js";
 
 // What the agent sends. Deliberately loose: every rule is checked here so problems come back
 // as one business result instead of a schema error.
+// Optional fields may arrive as null; null means "not given".
 export interface LineInput {
   item_id: string;
   qty: number;
-  note?: string;
+  note?: string | null;
 }
 export interface PlateInput {
-  label?: string;
+  label?: string | null;
   items: LineInput[];
 }
 export interface CreateOrderInput {
   customer_name: string;
-  customer_handle?: string;
-  plates?: PlateInput[];
-  drinks?: LineInput[];
+  customer_handle?: string | null;
+  plates?: PlateInput[] | null;
+  drinks?: LineInput[] | null;
 }
 
 export type ProblemCode = "invalid_order" | "empty_order" | "item_not_found" | "item_unavailable" | "wrong_section";

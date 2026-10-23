@@ -31,7 +31,10 @@ export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Ex
       void server.close();
     });
     try {
-      console.log(`[mcp] ${req.body?.method ?? "unknown method"}`);
+      const method: string = req.body?.method ?? "unknown method";
+      const tool: unknown = method === "tools/call" ? req.body?.params?.name : undefined;
+      console.log(`[mcp] ${method}${typeof tool === "string" ? ` ${tool}` : ""}`);
+      if (method === "tools/call") logRejections(res, String(tool), req.body?.params?.arguments);
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (err) {
@@ -50,4 +53,33 @@ export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Ex
   app.delete("/mcp", auth, methodNotAllowed);
 
   return app;
+}
+
+// The SDK rejects unknown tools and arguments that don't match a tool's schema before our handlers
+// run, so nothing else would log them. Watch the response and log those rejections with what was sent.
+function logRejections(res: Response, tool: string, args: unknown): void {
+  const chunks: Buffer[] = [];
+  const collect = (chunk: unknown) => {
+    if (typeof chunk === "string") chunks.push(Buffer.from(chunk));
+    else if (chunk instanceof Uint8Array) chunks.push(Buffer.from(chunk));
+  };
+  const write = res.write.bind(res) as (...a: unknown[]) => boolean;
+  const end = res.end.bind(res) as (...a: unknown[]) => Response;
+  res.write = ((chunk: unknown, ...rest: unknown[]) => {
+    collect(chunk);
+    return write(chunk, ...rest);
+  }) as Response["write"];
+  res.end = ((chunk?: unknown, ...rest: unknown[]) => {
+    if (typeof chunk !== "function") collect(chunk);
+    try {
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const text: unknown = body?.result?.content?.[0]?.text;
+      if (body?.result?.isError && typeof text === "string" && text.startsWith("MCP error")) {
+        console.warn(`[mcp] ${tool} rejected: ${text} | arguments: ${JSON.stringify(args)?.slice(0, 500)}`);
+      }
+    } catch {
+      // Not a JSON body (or not one we recognise): nothing to log.
+    }
+    return end(chunk, ...rest);
+  }) as Response["end"];
 }

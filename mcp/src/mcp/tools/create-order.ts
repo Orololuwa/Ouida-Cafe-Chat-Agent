@@ -6,12 +6,13 @@ import { jsonResult, systemError } from "../result.js";
 
 // The schema only fixes the shape. Ranges and lengths are checked in createOrder so that every
 // problem comes back in one result with a status code, rather than as a schema error.
+// Optional fields are .nullish(): agents often send null for a field they aren't using.
 const line = z.object({
   item_id: z.string().describe("An id from get_menu"),
   qty: z.number().describe(`Whole number from ${LIMITS.qtyMin} to ${LIMITS.qtyMax}`),
   note: z
     .string()
-    .optional()
+    .nullish()
     .describe(`Optional brand choice or kitchen request, max ${LIMITS.noteMax} characters`),
 });
 
@@ -19,18 +20,18 @@ const inputSchema = {
   customer_name: z.string().describe(`Name on the order, 1–${LIMITS.nameMax} characters`),
   customer_handle: z
     .string()
-    .optional()
+    .nullish()
     .describe("The customer's WhatsApp or simulator identity, if the conversation provides it"),
   plates: z
     .array(
       z.object({
-        label: z.string().optional().describe("Whose plate this is, e.g. Ada"),
+        label: z.string().nullish().describe("Whose plate this is, e.g. Ada"),
         items: z.array(line).describe("Food, protein and sweet items on this plate"),
       }),
     )
-    .optional()
+    .nullish()
     .describe(`Plates of food, at most ${LIMITS.platesMax}`),
-  drinks: z.array(line).optional().describe("Drinks and hot drinks; these never go on a plate"),
+  drinks: z.array(line).nullish().describe("Drinks and hot drinks; these never go on a plate"),
 };
 
 export function registerCreateOrder(server: McpServer, db: Database): void {
