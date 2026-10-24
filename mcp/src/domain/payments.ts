@@ -2,7 +2,7 @@ import type { Database } from "../db/index.js";
 import type { AppDeps } from "../deps.js";
 import { classifyStatus, type TransactionOutcome } from "../integrations/paystack.js";
 import { getOrder } from "./orders.js";
-import { formatNaira } from "./receipt.js";
+import { formatNaira, paymentConfirmedText } from "./receipt.js";
 import type { Order, PaymentAttempt } from "./types.js";
 
 // At most 5 payment links per order. Attempts where Paystack never returned a link don't
@@ -61,7 +61,7 @@ function notCompletedMessage(orderRef: string, amountNgn: number, url: string): 
 function paidResult(status: PaidResult["status"], order: Order): PaidResult {
   const message_text =
     status === "payment_confirmed"
-      ? `Payment received ✅\nOrder *${order.ref}* for ${order.customer_name} is confirmed.\nShow this reference when you collect it.`
+      ? paymentConfirmedText(order)
       : `Order *${order.ref}* for ${order.customer_name} is already paid ✅\nShow this reference when you collect it.`;
   return {
     status,

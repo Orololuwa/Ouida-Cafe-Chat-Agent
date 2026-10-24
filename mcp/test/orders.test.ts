@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { openDatabase, type Database } from "../src/db/index.js";
-import { createOrder, DUPLICATE_WINDOW_MS, generateRef, getOrder, type CreateOrderInput } from "../src/domain/orders.js";
+import { createOrder, DUPLICATE_WINDOW_MS, generateRef, getOrder, PAID_ECHO_WINDOW_MS, type CreateOrderInput } from "../src/domain/orders.js";
 
 const one = (item_id: string, qty = 1) => ({ item_id, qty });
 const orderCount = (db: Database) => (db.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number }).n;
@@ -237,4 +237,33 @@ test("Creating the same unpaid order again returns the existing one instead of a
   assert.equal(createOrder(db, input, new Date(t0.getTime() + DUPLICATE_WINDOW_MS + 1000)).status, "order_created");
   db.prepare("UPDATE orders SET status = 'paid'").run();
   assert.equal(createOrder(db, input, new Date(t0.getTime() + 120_000)).status, "order_created");
+});
+
+test("The same order paid moments ago returns the confirmation instead of a new order", () => {
+  const db = openDatabase(":memory:");
+  const input = { customer_name: "Chief", plates: [{ items: [one("rice-pepper-sauce-beef")] }] };
+  const t0 = new Date("2026-10-24T16:08:00Z");
+  const first = createOrder(db, input, t0);
+  assert.equal(first.status, "order_created");
+  if (first.status !== "order_created") return;
+  const paidAt = new Date(t0.getTime() + 60_000);
+  db.prepare("UPDATE orders SET status = 'paid', paid_at = ?, paid_reference = ? WHERE ref = ?").run(
+    paidAt.toISOString(),
+    `${first.order_ref}-1`,
+    first.order_ref,
+  );
+
+  const echo = createOrder(db, input, new Date(paidAt.getTime() + 30_000));
+  assert.equal(echo.status, "order_already_paid");
+  if (echo.status !== "order_already_paid") return;
+  assert.equal(echo.order_ref, first.order_ref);
+  assert.equal(
+    echo.message_text,
+    `Payment received ✅\nOrder *${first.order_ref}* for Chief is confirmed.\nShow this reference when you collect it.`,
+  );
+  assert.match(echo.next_step, /Send message_text/);
+  assert.equal(orderCount(db), 1);
+
+  assert.equal(createOrder(db, input, new Date(paidAt.getTime() + PAID_ECHO_WINDOW_MS + 1000)).status, "order_created");
+  assert.equal(createOrder(db, { ...input, customer_name: "Ada" }, paidAt).status, "order_created");
 });

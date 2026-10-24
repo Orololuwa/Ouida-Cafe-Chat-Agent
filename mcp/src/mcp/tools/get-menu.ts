@@ -9,7 +9,7 @@ export function registerGetMenu(server: McpServer, db: Database): void {
     {
       title: "Get menu",
       description:
-        "Returns today's menu: every available item with its id, name, category, price in naira and any preparation note, plus the per-plate fee. Call this before telling a customer what is available or what anything costs. Use the ids from this result when calling create_order.",
+        "Returns today's menu: every available item with its id, name, category, price in naira and any preparation note, plus the per-plate fee. Call this while the customer is still choosing, before naming an item or a price. Do not call it when they say yes or paid. Use the ids from this result when calling create_order.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },

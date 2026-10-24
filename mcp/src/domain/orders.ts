@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import type { Database } from "../db/index.js";
 import { catalogueIsEmpty, getCatalogue, getSettings } from "./menu.js";
-import { renderReceipt } from "./receipt.js";
+import { paymentConfirmedText, renderReceipt } from "./receipt.js";
 import type { CatalogueItem, Order, OrderLine, Plate } from "./types.js";
 
 // What the agent sends. Deliberately loose: every rule is checked here so problems come back
@@ -47,6 +47,14 @@ export type CreateOrderResult =
       receipt_text: string;
       next_step?: string;
     }
+  | {
+      // The same order was paid moments ago. A repeat create_order is the customer saying "paid", not a new lunch.
+      status: "order_already_paid";
+      order_ref: string;
+      customer_name: string;
+      message_text: string;
+      next_step: string;
+    }
   | { status: "menu_not_set" }
   | { status: ProblemCode; problems: Problem[] };
 
@@ -66,6 +74,9 @@ const REF_ATTEMPTS = 20;
 // Agents sometimes call create_order again when the customer says "yes" to a receipt.
 // An identical unpaid order for the same name within this window is returned instead of duplicated.
 export const DUPLICATE_WINDOW_MS = 30 * 60 * 1000;
+
+// An identical order paid inside this window is the customer confirming payment, not a second lunch.
+export const PAID_ECHO_WINDOW_MS = 5 * 60 * 1000;
 
 export function generateRef(): string {
   let ref = "OU-";
@@ -203,8 +214,7 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
     plateCount * settings.plate_fee_ngn;
 
   const customerHandle = input.customer_handle?.trim() || undefined;
-  const order: Order = {
-    ref: "",
+  const draft: Omit<Order, "ref"> = {
     customer_name: customerName,
     ...(customerHandle ? { customer_handle: customerHandle } : {}),
     status: "pending_payment",
@@ -215,7 +225,22 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
     total_ngn: total,
     created_at: now.toISOString(),
   };
-  const existing = findDuplicate(db, order, now);
+
+  const justPaid = findSameOrder(db, draft, now, "paid", PAID_ECHO_WINDOW_MS, "paid_at");
+  if (justPaid) {
+    console.log(`[orders] ${justPaid.ref} was just paid for ${justPaid.customer_name}; not starting another`);
+    return {
+      status: "order_already_paid",
+      order_ref: justPaid.ref,
+      customer_name: justPaid.customer_name,
+      message_text: paymentConfirmedText(justPaid),
+      next_step:
+        `Order ${justPaid.ref} is already paid. Send message_text to the customer as the entire reply. ` +
+        `Do not add anything before or after it, and do not call another tool.`,
+    };
+  }
+
+  const existing = findSameOrder(db, draft, now, "pending_payment", DUPLICATE_WINDOW_MS, "created_at");
   if (existing) {
     console.log(`[orders] ${existing.ref} already exists for ${existing.customer_name}; not creating a duplicate`);
     return {
@@ -230,13 +255,14 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
       drinks: existing.drinks,
       receipt_text: renderReceipt(existing),
       next_step:
-        `This exact order already exists as ${existing.ref} and the customer has seen its receipt. ` +
-        `If the customer has just confirmed it, call create_payment_link with order_ref ${existing.ref} now. ` +
+        `This exact order already exists as ${existing.ref}. Do not send the receipt again. ` +
+        `If the customer just said yes, call create_payment_link with order_ref ${existing.ref} now and send only its message_text. ` +
+        `If the customer said paid, call verify_payment with order_ref ${existing.ref} now and send only its message_text. ` +
         `Do not call create_order again unless the customer changes the order.`,
     };
   }
 
-  order.ref = saveOrder(db, order);
+  const order: Order = { ...draft, ref: saveOrder(db, draft) };
 
   return {
     status: "order_created",
@@ -261,22 +287,52 @@ function orderContent(o: Pick<Order, "plates" | "drinks">): string {
   });
 }
 
-// The most recent unpaid order with the same name and contents, created within the window.
-function findDuplicate(db: Database, order: Omit<Order, "ref">, now: Date): Order | undefined {
-  const since = new Date(now.getTime() - DUPLICATE_WINDOW_MS).toISOString();
-  const refs = db
-    .prepare(
-      `SELECT ref FROM orders
-       WHERE status = 'pending_payment' AND customer_name = ? COLLATE NOCASE AND created_at >= ?
-       ORDER BY created_at DESC LIMIT 20`,
-    )
-    .all(order.customer_name, since) as { ref: string }[];
+// The most recent order with the same name and contents, in the given status, inside the window.
+function findSameOrder(
+  db: Database,
+  order: Omit<Order, "ref">,
+  now: Date,
+  status: Order["status"],
+  windowMs: number,
+  timeColumn: "created_at" | "paid_at",
+): Order | undefined {
+  const since = new Date(now.getTime() - windowMs).toISOString();
+  const sql =
+    timeColumn === "paid_at"
+      ? `SELECT ref FROM orders
+         WHERE status = ? AND customer_name = ? COLLATE NOCASE AND paid_at >= ?
+         ORDER BY paid_at DESC LIMIT 20`
+      : `SELECT ref FROM orders
+         WHERE status = ? AND customer_name = ? COLLATE NOCASE AND created_at >= ?
+         ORDER BY created_at DESC LIMIT 20`;
+  const refs = db.prepare(sql).all(status, order.customer_name, since) as { ref: string }[];
   const wanted = orderContent(order);
   for (const { ref } of refs) {
     const candidate = getOrder(db, ref);
     if (candidate && orderContent(candidate) === wanted) return candidate;
   }
   return undefined;
+}
+
+export interface RecentOrder {
+  ref: string;
+  status: Order["status"];
+  customer_name: string;
+}
+
+// Orders created or paid inside the window, newest activity first. Used when a tool call arrives
+// with no arguments and the only clue is what was just saved.
+export function listRecentOrders(db: Database, since: Date): RecentOrder[] {
+  const iso = since.toISOString();
+  return db
+    .prepare(
+      `SELECT ref, status, customer_name
+       FROM orders
+       WHERE created_at >= ? OR (paid_at IS NOT NULL AND paid_at >= ?)
+       ORDER BY COALESCE(paid_at, created_at) DESC
+       LIMIT 5`,
+    )
+    .all(iso, iso) as unknown as RecentOrder[];
 }
 
 // Inserts the order under a fresh random reference, regenerating on the rare collision.

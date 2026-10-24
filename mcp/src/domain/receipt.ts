@@ -5,6 +5,11 @@ export function formatNaira(amount: number): string {
   return `₦${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
 
+// What the customer sees once Paystack has confirmed the exact amount.
+export function paymentConfirmedText(order: Pick<Order, "ref" | "customer_name">): string {
+  return `Payment received ✅\nOrder *${order.ref}* for ${order.customer_name} is confirmed.\nShow this reference when you collect it.`;
+}
+
 function line(l: OrderLine): string {
   const name = l.note ? `${l.name} (${l.note})` : l.name;
   return `• ${l.qty}× ${name} — ${formatNaira(l.line_total_ngn)}`;
