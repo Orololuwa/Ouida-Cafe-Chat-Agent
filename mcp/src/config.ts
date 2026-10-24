@@ -4,6 +4,7 @@ export interface Config {
   port: number;
   host: string;
   mcpToken: string;
+  ownerMcpToken: string;
   dbPath: string;
   paystackSecretKey: string;
   publicBaseUrl: string; // no trailing slash
@@ -16,6 +17,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const mcpToken = env.MCP_TOKEN;
   if (!mcpToken || mcpToken.length < 32) {
     throw new ConfigError("MCP_TOKEN is missing or shorter than 32 characters. Set it in .env.");
+  }
+
+  // A second token so the owner line cannot be reached with the customer token, or the other way round.
+  const ownerMcpToken = env.OWNER_MCP_TOKEN;
+  if (!ownerMcpToken || ownerMcpToken.length < 32) {
+    throw new ConfigError("OWNER_MCP_TOKEN is missing or shorter than 32 characters. Set it in .env.");
+  }
+  if (ownerMcpToken === mcpToken) {
+    throw new ConfigError("OWNER_MCP_TOKEN must be different from MCP_TOKEN.");
   }
 
   // Test mode only in v1: refuse anything that isn't a Paystack test key.
@@ -39,6 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // 127.0.0.1 when run directly; Docker sets HOST=0.0.0.0 so Caddy can reach it over the "web" network.
     host: env.HOST ?? "127.0.0.1",
     mcpToken,
+    ownerMcpToken,
     // Docker sets DB_PATH=/data/ouida.db on a mounted volume; locally it lands in ./data.
     dbPath: env.DB_PATH ?? "data/ouida.db",
     paystackSecretKey,

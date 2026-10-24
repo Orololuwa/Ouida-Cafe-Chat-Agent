@@ -15,7 +15,7 @@ let server: Server;
 let base = "";
 
 before(async () => {
-  server = createApp(deps, { mcpToken: "t".repeat(32) }).listen(0, "127.0.0.1");
+  server = createApp(deps, { mcpToken: "t".repeat(32), ownerMcpToken: "o".repeat(32) }).listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });

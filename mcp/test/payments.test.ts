@@ -167,6 +167,7 @@ test("11. Paystack failures become payment_link_failed / payment_check_failed, a
 test("12. The server refuses a live key", () => {
   const env = {
     MCP_TOKEN: "x".repeat(32),
+    OWNER_MCP_TOKEN: "y".repeat(32),
     PUBLIC_BASE_URL: "https://ouida-mcp.eleven-sports.app/",
     PAYMENT_EMAIL_DOMAIN: "orders.eleven-sports.app",
   };
@@ -175,6 +176,8 @@ test("12. The server refuses a live key", () => {
   assert.throws(() => loadConfig({ ...env, PAYSTACK_SECRET_KEY: "sk_test_abc", PUBLIC_BASE_URL: "ouida" }), ConfigError);
   const ok = loadConfig({ ...env, PAYSTACK_SECRET_KEY: "sk_test_abc" });
   assert.equal(ok.publicBaseUrl, "https://ouida-mcp.eleven-sports.app"); // trailing slash trimmed
+  assert.throws(() => loadConfig({ ...env, PAYSTACK_SECRET_KEY: "sk_test_abc", OWNER_MCP_TOKEN: "x".repeat(32) }), ConfigError);
+  assert.throws(() => loadConfig({ ...env, PAYSTACK_SECRET_KEY: "sk_test_abc", OWNER_MCP_TOKEN: "short" }), ConfigError);
 });
 
 test("13. An existing database upgrades in place with its orders intact", () => {
@@ -196,6 +199,7 @@ test("13. An existing database upgrades in place with its orders intact", () => 
     const cols = (db.prepare("PRAGMA table_info(orders)").all() as { name: string }[]).map((c) => c.name);
     assert.ok(cols.includes("paid_at") && cols.includes("paid_reference"));
     assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'payment_attempts'").get());
+    assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'menu_changes'").get());
     db.close();
     openDatabase(path).close(); // a second start is a no-op
   } finally {

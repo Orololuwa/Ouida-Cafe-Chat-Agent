@@ -12,7 +12,7 @@ let server: Server;
 let base = "";
 
 before(async () => {
-  server = createApp(makeDeps(), { mcpToken: TOKEN }).listen(0, "127.0.0.1");
+  server = createApp(makeDeps(), { mcpToken: TOKEN, ownerMcpToken: "o".repeat(32) }).listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -71,7 +71,7 @@ test("Tools without arguments, and calls with arguments, are not intercepted", a
 async function withOrders(setup: (deps: AppDeps) => void, run: (url: string) => Promise<void>) {
   const deps = makeDeps();
   setup(deps);
-  const s = createApp(deps, { mcpToken: TOKEN }).listen(0, "127.0.0.1");
+  const s = createApp(deps, { mcpToken: TOKEN, ownerMcpToken: "o".repeat(32) }).listen(0, "127.0.0.1");
   await new Promise((resolve) => s.once("listening", resolve));
   const url = `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
   try {

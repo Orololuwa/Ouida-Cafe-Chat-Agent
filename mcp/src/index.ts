@@ -22,7 +22,7 @@ const app = createApp(
     publicBaseUrl: config.publicBaseUrl,
     paymentEmailDomain: config.paymentEmailDomain,
   },
-  { mcpToken: config.mcpToken },
+  { mcpToken: config.mcpToken, ownerMcpToken: config.ownerMcpToken },
 );
 app.listen(config.port, config.host, () => {
   console.log(`ouida-mcp listening on http://${config.host}:${config.port} (Paystack test mode, public URL ${config.publicBaseUrl})`);

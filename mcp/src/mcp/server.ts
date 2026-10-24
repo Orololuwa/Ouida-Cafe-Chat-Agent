@@ -3,6 +3,7 @@ import type { AppDeps } from "../deps.js";
 import { registerCreateOrder } from "./tools/create-order.js";
 import { registerCreatePaymentLink } from "./tools/create-payment-link.js";
 import { registerGetMenu } from "./tools/get-menu.js";
+import { registerOwnerTools } from "./tools/owner.js";
 import { registerPing } from "./tools/ping.js";
 import { registerVerifyPayment } from "./tools/verify-payment.js";
 
@@ -16,5 +17,12 @@ export function buildServer(deps: AppDeps): McpServer {
   registerCreateOrder(server, deps.db);
   registerCreatePaymentLink(server, deps);
   registerVerifyPayment(server, deps);
+  return server;
+}
+
+// The menu teammate's server. Only owner tools: a customer assignment cannot change prices.
+export function buildOwnerServer(deps: AppDeps): McpServer {
+  const server = new McpServer({ name: "ouida-menu-desk", version: "0.1.1" });
+  registerOwnerTools(server, deps.db);
   return server;
 }

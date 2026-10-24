@@ -1,17 +1,15 @@
-import express, { type Express, type Request, type Response } from "express";
+import express, { type Express, type Request, type RequestHandler, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AppDeps } from "../deps.js";
-import { buildServer } from "../mcp/server.js";
+import { buildOwnerServer, buildServer } from "../mcp/server.js";
 import { requireBearer } from "./auth.js";
 import { retryOnEmptyArguments } from "./empty-arguments.js";
 import { paidPage } from "./paid-page.js";
 
-export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Express {
+export function createApp(deps: AppDeps, tokens: { mcpToken: string; ownerMcpToken: string }): Express {
   const app = express();
   app.set("trust proxy", ["loopback", "uniquelocal"]); // behind Caddy: log the caller's real IP
   app.use(express.json({ limit: "1mb" }));
-
-  const auth = requireBearer(mcpToken);
 
   // Unauthenticated health check: lets you confirm HTTPS works before involving Chord.
   app.get("/health", (_req, res) => {
@@ -21,8 +19,30 @@ export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Ex
   // Public: Paystack returns the customer here after checkout. See paid-page.ts.
   app.get("/paid", paidPage(deps));
 
-  app.post("/mcp", auth, retryOnEmptyArguments(deps), async (req, res) => {
-    const server = buildServer(deps);
+  // Stateless servers don't support the GET (server-to-client stream) or DELETE (end session) routes.
+  const methodNotAllowed = (_req: Request, res: Response) => {
+    res.status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null });
+  };
+
+  // Customer tools and owner tools are separate servers with separate tokens, so a wrong
+  // assignment in Chord still cannot cross from one line to the other.
+  mountMcp(app, deps, "/mcp", "mcp", requireBearer(tokens.mcpToken), () => buildServer(deps), methodNotAllowed);
+  mountMcp(app, deps, "/mcp/owner", "owner", requireBearer(tokens.ownerMcpToken), () => buildOwnerServer(deps), methodNotAllowed);
+
+  return app;
+}
+
+function mountMcp(
+  app: Express,
+  deps: AppDeps,
+  path: string,
+  label: string,
+  auth: ReturnType<typeof requireBearer>,
+  build: () => ReturnType<typeof buildServer>,
+  methodNotAllowed: RequestHandler,
+): void {
+  app.post(path, auth, retryOnEmptyArguments(deps), async (req, res) => {
+    const server = build();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
       enableJsonResponse: true, // plain JSON replies, so no streaming through proxies
@@ -34,31 +54,24 @@ export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Ex
     try {
       const method: string = req.body?.method ?? "unknown method";
       const tool: unknown = method === "tools/call" ? req.body?.params?.name : undefined;
-      console.log(`[mcp] ${method}${typeof tool === "string" ? ` ${tool}` : ""}`);
-      if (method === "tools/call") logRejections(res, String(tool), req.body?.params?.arguments);
+      console.log(`[${label}] ${method}${typeof tool === "string" ? ` ${tool}` : ""}`);
+      if (method === "tools/call") logRejections(res, label, String(tool), req.body?.params?.arguments);
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (err) {
-      console.error("[mcp] error handling request", err);
+      console.error(`[${label}] error handling request`, err);
       if (!res.headersSent) {
         res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: "Internal server error" }, id: null });
       }
     }
   });
-
-  // Stateless servers don't support the GET (server-to-client stream) or DELETE (end session) routes.
-  const methodNotAllowed = (_req: Request, res: Response) => {
-    res.status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null });
-  };
-  app.get("/mcp", auth, methodNotAllowed);
-  app.delete("/mcp", auth, methodNotAllowed);
-
-  return app;
+  app.get(path, auth, methodNotAllowed);
+  app.delete(path, auth, methodNotAllowed);
 }
 
 // The SDK rejects unknown tools and arguments that don't match a tool's schema before our handlers
 // run, so nothing else would log them. Watch the response and log those rejections with what was sent.
-function logRejections(res: Response, tool: string, args: unknown): void {
+function logRejections(res: Response, label: string, tool: string, args: unknown): void {
   const chunks: Buffer[] = [];
   const collect = (chunk: unknown) => {
     if (typeof chunk === "string") chunks.push(Buffer.from(chunk));
@@ -76,7 +89,7 @@ function logRejections(res: Response, tool: string, args: unknown): void {
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       const text: unknown = body?.result?.content?.[0]?.text;
       if (body?.result?.isError && typeof text === "string" && text.startsWith("MCP error")) {
-        console.warn(`[mcp] ${tool} rejected: ${text} | arguments: ${JSON.stringify(args)?.slice(0, 500)}`);
+        console.warn(`[${label}] ${tool} rejected: ${text} | arguments: ${JSON.stringify(args)?.slice(0, 500)}`);
       }
     } catch {
       // Not a JSON body (or not one we recognise): nothing to log.

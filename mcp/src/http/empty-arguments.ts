@@ -4,6 +4,14 @@ import { DUPLICATE_WINDOW_MS, listRecentOrders, type RecentOrder } from "../doma
 
 const TOOLS = new Set(["create_order", "create_payment_link", "verify_payment"]);
 
+const OWNER_EMPTY: Record<string, string> = {
+  set_availability:
+    "Say nothing yet. Call set_availability again with changes: an item_id from list_menu and available true or false for each item.",
+  update_price: "Say nothing yet. Call update_price again with item_id from list_menu and price_ngn in whole naira.",
+  set_todays_menu:
+    "Say nothing yet. Call set_todays_menu again with available_item_ids, the food, protein and sweet ids that should be on. Leave drinks out.",
+};
+
 // Some agent turns start with a tool call that has no arguments ({}), then a second call that has
 // them. Answering the first one as a schema error makes the agent tell the customer the order is
 // broken. Answer it as a normal result that names the next tool, and say nothing the customer
@@ -17,7 +25,24 @@ export function retryOnEmptyArguments(deps: AppDeps): RequestHandler {
     const args: unknown = body.params?.arguments;
     const empty =
       args === undefined || args === null || (typeof args === "object" && !Array.isArray(args) && Object.keys(args).length === 0);
-    if (!empty || typeof tool !== "string" || !TOOLS.has(tool)) return next();
+    if (!empty || typeof tool !== "string" || (!TOOLS.has(tool) && !Object.hasOwn(OWNER_EMPTY, tool))) return next();
+
+    if (Object.hasOwn(OWNER_EMPTY, tool)) {
+      console.warn(`[owner] ${tool} had no arguments (${args === undefined ? "missing" : "empty"})`);
+      res.json({
+        jsonrpc: "2.0",
+        id: body.id ?? null,
+        result: {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ status: "ignored_empty_call", say_nothing_to_customer: true, next_step: OWNER_EMPTY[tool] }),
+            },
+          ],
+        },
+      });
+      return;
+    }
 
     const since = new Date(Date.now() - DUPLICATE_WINDOW_MS);
     const recent = listRecentOrders(deps.db, since);

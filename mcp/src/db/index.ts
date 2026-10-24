@@ -38,6 +38,17 @@ const SCHEMA = `
     paid_reference  TEXT
   );
 
+  -- One row per real catalogue change, written in the same transaction as the change.
+  CREATE TABLE IF NOT EXISTS menu_changes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id    TEXT NOT NULL,
+    field      TEXT NOT NULL CHECK (field IN ('price_ngn', 'available')),
+    old_value  TEXT NOT NULL,
+    new_value  TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    via        TEXT NOT NULL
+  );
+
   -- One row per Paystack transaction. Never deleted, so this is each order's payment history.
   CREATE TABLE IF NOT EXISTS payment_attempts (
     paystack_ref      TEXT PRIMARY KEY,

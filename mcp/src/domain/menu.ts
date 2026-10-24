@@ -36,18 +36,20 @@ export function getCatalogue(db: Database): Map<string, CatalogueItem> {
   return new Map(rows.map((row) => [row.id, toItem(row)]));
 }
 
+const MENU_ORDER = `ORDER BY CASE category
+         WHEN 'food' THEN 1 WHEN 'protein' THEN 2 WHEN 'sweet' THEN 3
+         WHEN 'hot_drink' THEN 4 WHEN 'drink' THEN 5 END,
+       name COLLATE NOCASE`;
+
+// Every item in menu order, including ones switched off. The owner list uses this.
+export function getAllItems(db: Database): CatalogueItem[] {
+  const rows = db.prepare(`SELECT * FROM catalogue ${MENU_ORDER}`).all() as unknown as CatalogueRow[];
+  return rows.map(toItem);
+}
+
 // Available items in menu order: food, protein, sweet, hot drinks, drinks; then by name.
 export function getAvailableItems(db: Database): CatalogueItem[] {
-  const rows = db
-    .prepare(
-      `SELECT * FROM catalogue
-       WHERE available = 1
-       ORDER BY CASE category
-                  WHEN 'food' THEN 1 WHEN 'protein' THEN 2 WHEN 'sweet' THEN 3
-                  WHEN 'hot_drink' THEN 4 WHEN 'drink' THEN 5 END,
-                name COLLATE NOCASE`,
-    )
-    .all() as unknown as CatalogueRow[];
+  const rows = db.prepare(`SELECT * FROM catalogue WHERE available = 1 ${MENU_ORDER}`).all() as unknown as CatalogueRow[];
   return rows.map(toItem);
 }
 

@@ -1,6 +1,6 @@
 # ouida-mcp
 
-MCP server for the Ouida Café order desk on Chord. It is the single source of truth for the menu and prices, prices every order itself, and is the only thing that decides an order is paid.
+MCP server for the Ouida Café order desk on Chord. It is the single source of truth for the menu and prices, prices every order itself, and is the only thing that decides an order is paid. The owner changes that same menu through a second endpoint, `/mcp/owner`.
 
 Runs in Docker on port 8020, on the shared `web` network, behind the existing Caddy proxy. Data lives in SQLite at `/data/ouida.db`, on a volume that survives redeploys.
 
@@ -14,6 +14,16 @@ Runs in Docker on port 8020, on the shared `web` network, behind the existing Ca
 | `create_payment_link` | Returns a Paystack checkout link for an order, reusing the current one while it's still usable. Each attempt has its own reference (`OU-7KQ3-1`, `-2`, …), at most 5 per order |
 | `verify_payment` | Asks Paystack about every open attempt and marks the order `paid` only when one is `success`, for exactly the order total, in NGN |
 
+`/mcp/owner` has its own token and only the owner's tools. A change is in the customer's next `get_menu`.
+
+| Tool | What it does |
+| --- | --- |
+| `list_menu` | The whole catalogue, including items that are off today |
+| `set_availability` | Switches items on or off. Unknown ids change nothing |
+| `update_price` | Sets one item's price for new orders. A jump of more than 50% is saved only when confirmed a second time |
+| `todays_orders` | Today's paid orders (Lagos day), the kitchen quantities, and how many orders are still unpaid |
+| `set_todays_menu` | Switches the listed food, protein and sweet items on and every other plate item off. Drinks stay as they are |
+
 Business outcomes (`item_not_found`, `payment_failed`, …) come back as normal results with a `status`. Only unexpected failures are tool errors (`Order system unavailable`).
 
 `GET /paid` is the public page Paystack sends customers back to. It runs the same check as `verify_payment`, so an order is marked paid even if the customer never replies.
@@ -26,16 +36,17 @@ src/
 ├── config.ts             environment variables, checked once at startup
 ├── deps.ts               what tools and routes need at runtime (db, Paystack client, URLs)
 ├── http/
-│   ├── app.ts            Express app: /health, /paid and /mcp
+│   ├── app.ts            Express app: /health, /paid, /mcp and /mcp/owner
 │   ├── auth.ts           bearer-token middleware
 │   └── paid-page.ts      the public Paystack callback page
 ├── mcp/
-│   ├── server.ts         buildServer(): registers every tool
+│   ├── server.ts         buildServer() for orders, buildOwnerServer() for the menu desk
 │   ├── result.ts         result / tool-error helpers
 │   └── tools/            one file per tool: schema, description, handler
 ├── domain/               business rules, no HTTP or MCP code
 │   ├── types.ts          catalogue, order and payment-attempt shapes
 │   ├── menu.ts           reads the catalogue and settings
+│   ├── owner.ts          owner edits: availability, price, today's menu, today's orders, the change log
 │   ├── orders.ts         validation, pricing, references, saving
 │   ├── receipt.ts        WhatsApp receipt rendering
 │   └── payments.ts       attempts, the three checks, marking orders paid, messages
@@ -57,7 +68,8 @@ In `mcp/.env` on each machine (never committed). See `.env.example`.
 
 | Variable | Example | Notes |
 | --- | --- | --- |
-| `MCP_TOKEN` | 64 hex characters | Chord's bearer token; 32+ characters |
+| `MCP_TOKEN` | 64 hex characters | Chord's bearer token for `/mcp`; 32+ characters |
+| `OWNER_MCP_TOKEN` | 64 hex characters | Bearer token for `/mcp/owner`. Must differ from `MCP_TOKEN` |
 | `PAYSTACK_SECRET_KEY` | `sk_test_…` | Paystack dashboard, test mode. The server refuses to start unless it begins with `sk_test_` |
 | `PUBLIC_BASE_URL` | `https://ouida-mcp.eleven-sports.app` | Paystack's `callback_url` and `cancel_action`. Locally `http://127.0.0.1:8020` |
 | `PAYMENT_EMAIL_DOMAIN` | `orders.eleven-sports.app` | Paystack needs an email; each order gets `ou-7kq3@<domain>` |
@@ -84,6 +96,7 @@ First time only, from `/srv/ouida-cafe`:
 ```bash
 cp mcp/.env.example mcp/.env
 sed -i "s/^MCP_TOKEN=.*/MCP_TOKEN=$(openssl rand -hex 32)/" mcp/.env
+sed -i "s/^OWNER_MCP_TOKEN=.*/OWNER_MCP_TOKEN=$(openssl rand -hex 32)/" mcp/.env
 mkdir -p data && sudo chown 1000:1000 data   # writable by the container's node user
 ```
 
@@ -98,7 +111,7 @@ docker compose logs -f
 
 ```bash
 docker run --rm --network web curlimages/curl -s http://ouida-mcp:8020/health
-scripts/smoke-test.sh https://ouida-mcp.eleven-sports.app "$MCP_TOKEN"
+scripts/smoke-test.sh https://ouida-mcp.eleven-sports.app "$MCP_TOKEN" "$OWNER_MCP_TOKEN"
 ```
 
 The smoke test creates a few real `pending_payment` orders and one Paystack test transaction. That is harmless: unpaid orders never reach the kitchen, and test mode moves no money. It ends by printing how to finish the payment by hand with a [Paystack test card](https://paystack.com/docs/payments/test-payments/):

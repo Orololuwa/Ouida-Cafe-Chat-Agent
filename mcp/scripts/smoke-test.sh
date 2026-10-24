@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: scripts/smoke-test.sh <base-url> <token>
+# Usage: scripts/smoke-test.sh <base-url> <orders-token> [owner-token]
 # Note: steps 7, 8 and 13 create real pending_payment orders and a Paystack test-mode transaction.
 # That is harmless: unpaid orders never reach the kitchen, and test mode moves no money.
 set -euo pipefail
@@ -46,6 +46,17 @@ echo "17. /paid?cancelled=1 (expect 'Payment cancelled'):"
 curl -sS "$BASE/paid?cancelled=1" | grep -o 'Payment cancelled[^<]*' || echo "MISSING"
 echo "18. /paid with an unknown reference (expect 'We couldn't find this payment'):"
 curl -sS "$BASE/paid?reference=OU-ZZZZ-1" | grep -o "We couldn't find this payment[^<]*" || echo "MISSING"
+
+OWNER="${3:-}"
+if [[ -n "$OWNER" ]]; then
+  echo "19. Orders token on /mcp/owner (expect 401):"
+  curl -sS -o /dev/null -w "%{http_code}\n" -X POST "$BASE/mcp/owner" "${HDRS[@]}" -H "Authorization: Bearer $TOKEN" -d '{}'
+  echo "20. Owner token on /mcp (expect 401):"
+  curl -sS -o /dev/null -w "%{http_code}\n" -X POST "$BASE/mcp" "${HDRS[@]}" -H "Authorization: Bearer $OWNER" -d '{}'
+  echo "21. Owner tools/list (expect list_menu, set_availability, update_price, todays_orders, set_todays_menu; no create_order):"
+  curl -sS -X POST "$BASE/mcp/owner" "${HDRS[@]}" -H "Authorization: Bearer $OWNER" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+  echo
+fi
 
 echo
 echo "To finish by hand: open the link from step 13, pay with test card 4084 0840 8408 4081 (CVV 408, any future expiry),"
