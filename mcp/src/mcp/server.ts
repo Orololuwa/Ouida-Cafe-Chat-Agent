@@ -9,7 +9,9 @@ import { registerVerifyPayment } from "./tools/verify-payment.js";
 // What to tell the agent when one of these tools is called with no arguments (see http/empty-arguments.ts).
 export const RETRY_HINTS: Record<string, string> = {
   create_order:
-    "Call create_order again now with customer_name, the plates (item_id and qty for each item) and any drinks from the conversation.",
+    "If you already sent this customer a receipt and they just said yes, don't create the order again: " +
+    "call create_payment_link now with order_ref set to the OU-XXXX reference from that receipt. " +
+    "Otherwise call create_order again now with customer_name, the plates (item_id and qty for each item) and any drinks from the conversation.",
   create_payment_link:
     "Call create_payment_link again now with order_ref set to the OU-XXXX reference from your latest receipt in this conversation.",
   verify_payment: "Call verify_payment again now with order_ref set to the order's OU-XXXX reference from this conversation.",

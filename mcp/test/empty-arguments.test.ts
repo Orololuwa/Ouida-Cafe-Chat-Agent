@@ -38,7 +38,7 @@ test("A call that arrives with no arguments gets a plain instruction to call aga
     assert.equal(r.result.isError, true);
     assert.match(r.result.content[0].text, /arrived with no arguments.*not a problem with the order.*Call create_payment_link again now with order_ref/s);
   }
-  assert.match((await call("create_order", {})).result.content[0].text, /Call create_order again now with customer_name/);
+  assert.match((await call("create_order", {})).result.content[0].text, /don.t create the order again.*call create_payment_link now.*Otherwise call create_order again now with customer_name/s);
   assert.match((await call("verify_payment", {})).result.content[0].text, /Call verify_payment again now with order_ref/);
 });
 
