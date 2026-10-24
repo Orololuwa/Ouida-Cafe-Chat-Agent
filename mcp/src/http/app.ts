@@ -1,8 +1,9 @@
 import express, { type Express, type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AppDeps } from "../deps.js";
-import { buildServer } from "../mcp/server.js";
+import { buildServer, RETRY_HINTS } from "../mcp/server.js";
 import { requireBearer } from "./auth.js";
+import { retryOnEmptyArguments } from "./empty-arguments.js";
 import { paidPage } from "./paid-page.js";
 
 export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Express {
@@ -20,7 +21,7 @@ export function createApp(deps: AppDeps, { mcpToken }: { mcpToken: string }): Ex
   // Public: Paystack returns the customer here after checkout. See paid-page.ts.
   app.get("/paid", paidPage(deps));
 
-  app.post("/mcp", auth, async (req, res) => {
+  app.post("/mcp", auth, retryOnEmptyArguments(RETRY_HINTS), async (req, res) => {
     const server = buildServer(deps);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
