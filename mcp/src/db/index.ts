@@ -35,7 +35,11 @@ const SCHEMA = `
     total_ngn       INTEGER NOT NULL,
     created_at      TEXT NOT NULL,
     paid_at         TEXT,
-    paid_reference  TEXT
+    paid_reference  TEXT,
+    notify_status   TEXT CHECK (notify_status IS NULL OR notify_status IN ('pending', 'sent', 'failed', 'skipped')),
+    notified_at     TEXT,
+    notify_thread_id TEXT,
+    notify_error    TEXT
   );
 
   -- One row per real catalogue change, written in the same transaction as the change.
@@ -70,6 +74,10 @@ const SCHEMA = `
 const ADDED_COLUMNS: { table: string; column: string; definition: string }[] = [
   { table: "orders", column: "paid_at", definition: "TEXT" },
   { table: "orders", column: "paid_reference", definition: "TEXT" },
+  { table: "orders", column: "notify_status", definition: "TEXT" },
+  { table: "orders", column: "notified_at", definition: "TEXT" },
+  { table: "orders", column: "notify_thread_id", definition: "TEXT" },
+  { table: "orders", column: "notify_error", definition: "TEXT" },
 ];
 
 const DEFAULT_SETTINGS: Record<string, string> = {

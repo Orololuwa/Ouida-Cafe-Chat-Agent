@@ -49,9 +49,11 @@ src/
 │   ├── owner.ts          owner edits: availability, price, today's menu, today's orders, the change log
 │   ├── orders.ts         validation, pricing, references, saving
 │   ├── receipt.ts        WhatsApp receipt rendering
-│   └── payments.ts       attempts, the three checks, marking orders paid, messages
+│   ├── payments.ts       attempts, the three checks, marking orders paid, messages
+│   └── notifications.ts  paid-order notice text and the owner-chat queue
 ├── integrations/
-│   └── paystack.ts       the two Paystack calls, timeouts, status mapping
+│   ├── paystack.ts       the two Paystack calls, timeouts, status mapping
+│   └── chord.ts          thread list, take-over, operator message, hand-back
 └── db/
     ├── index.ts          opens the database, creates and upgrades tables, seeds
     └── seed/catalogue.json   the initial 33-item catalogue
@@ -74,6 +76,13 @@ In `mcp/.env` on each machine (never committed). See `.env.example`.
 | `PUBLIC_BASE_URL` | `https://ouida-mcp.eleven-sports.app` | Paystack's `callback_url` and `cancel_action`. Locally `http://127.0.0.1:8020` |
 | `PAYMENT_EMAIL_DOMAIN` | `orders.eleven-sports.app` | Paystack needs an email; each order gets `ou-7kq3@<domain>` |
 | `DB_PATH` | `data/ouida.db` | Docker sets `/data/ouida.db` |
+| `NOTIFY_OWNER` | `false` | `true` posts a paid-order notice into the owner's newest open menu-teammate chat |
+| `CHORD_BASE_URL` | `https://api.chordhq.xyz` | Required when `NOTIFY_OWNER=true`. No path |
+| `CHORD_API_KEY` | | Chord key with only `thread:read` and `thread:write` |
+| `CHORD_WORKSPACE_ID` | | Workspace that owns the menu teammate |
+| `MENU_TEAMMATE_ID` | | The menu teammate's agent id. The server refuses to start if this is missing while notifications are on |
+
+Paid-order notices run only after the payment is committed. A Chord failure cannot undo the payment. The message is posted as an operator message (take over, post, hand back), so it shows in the Chord app on the latest open menu chat. The simulator does not show operator messages. Leave `NOTIFY_OWNER` unset or `false` and nothing else changes.
 
 ## Develop
 

@@ -198,6 +198,7 @@ test("13. An existing database upgrades in place with its orders intact", () => 
     assert.equal(order.status, "pending_payment");
     const cols = (db.prepare("PRAGMA table_info(orders)").all() as { name: string }[]).map((c) => c.name);
     assert.ok(cols.includes("paid_at") && cols.includes("paid_reference"));
+    assert.ok(["notify_status", "notified_at", "notify_thread_id", "notify_error"].every((name) => cols.includes(name)));
     assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'payment_attempts'").get());
     assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'menu_changes'").get());
     db.close();

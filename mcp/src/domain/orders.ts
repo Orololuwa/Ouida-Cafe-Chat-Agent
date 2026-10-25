@@ -375,6 +375,10 @@ interface OrderRow {
   created_at: string;
   paid_at: string | null;
   paid_reference: string | null;
+  notify_status: Order["notify_status"] | null;
+  notified_at: string | null;
+  notify_thread_id: string | null;
+  notify_error: string | null;
 }
 
 export function getOrder(db: Database, ref: string): Order | undefined {
@@ -393,5 +397,9 @@ export function getOrder(db: Database, ref: string): Order | undefined {
     created_at: row.created_at,
     ...(row.paid_at ? { paid_at: row.paid_at } : {}),
     ...(row.paid_reference ? { paid_reference: row.paid_reference } : {}),
+    ...(row.notify_status ? { notify_status: row.notify_status } : {}),
+    ...(row.notified_at ? { notified_at: row.notified_at } : {}),
+    ...(row.notify_thread_id ? { notify_thread_id: row.notify_thread_id } : {}),
+    ...(row.notify_error ? { notify_error: row.notify_error } : {}),
   };
 }

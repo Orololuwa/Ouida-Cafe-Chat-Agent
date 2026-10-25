@@ -49,6 +49,10 @@ export interface Order {
   created_at: string;
   paid_at?: string; // set once, when verified
   paid_reference?: string; // the payment attempt that paid
+  notify_status?: "pending" | "sent" | "failed" | "skipped";
+  notified_at?: string;
+  notify_thread_id?: string;
+  notify_error?: string;
 }
 
 // One Paystack transaction for an order. `status` is "initialized" when created,

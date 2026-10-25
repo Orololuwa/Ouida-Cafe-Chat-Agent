@@ -1,5 +1,12 @@
 // Every environment variable the service reads, checked once at startup.
 
+export interface ChordConfig {
+  baseUrl: string;
+  apiKey: string;
+  workspaceId: string;
+  menuTeammateId: string;
+}
+
 export interface Config {
   port: number;
   host: string;
@@ -9,6 +16,8 @@ export interface Config {
   paystackSecretKey: string;
   publicBaseUrl: string; // no trailing slash
   paymentEmailDomain: string;
+  notifyOwner: boolean;
+  chord?: ChordConfig;
 }
 
 export class ConfigError extends Error {}
@@ -44,6 +53,24 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new ConfigError("PAYMENT_EMAIL_DOMAIN must be a domain like orders.eleven-sports.app.");
   }
 
+  const notifyOwner = (env.NOTIFY_OWNER ?? "").trim().toLowerCase() === "true";
+  let chord: ChordConfig | undefined;
+  if (notifyOwner) {
+    const baseUrl = (env.CHORD_BASE_URL ?? "").replace(/\/+$/, "");
+    const apiKey = env.CHORD_API_KEY ?? "";
+    const workspaceId = env.CHORD_WORKSPACE_ID ?? "";
+    const menuTeammateId = env.MENU_TEAMMATE_ID ?? "";
+    if (!/^https?:\/\/[^/\s]+$/.test(baseUrl)) {
+      throw new ConfigError("CHORD_BASE_URL must be an origin like https://api.chordhq.xyz when NOTIFY_OWNER=true.");
+    }
+    if (!apiKey || !workspaceId || !menuTeammateId) {
+      throw new ConfigError(
+        "NOTIFY_OWNER=true needs CHORD_BASE_URL, CHORD_API_KEY, CHORD_WORKSPACE_ID and MENU_TEAMMATE_ID.",
+      );
+    }
+    chord = { baseUrl, apiKey, workspaceId, menuTeammateId };
+  }
+
   return {
     port: Number(env.PORT ?? 8020),
     // 127.0.0.1 when run directly; Docker sets HOST=0.0.0.0 so Caddy can reach it over the "web" network.
@@ -55,5 +82,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     paystackSecretKey,
     publicBaseUrl,
     paymentEmailDomain,
+    notifyOwner,
+    ...(chord ? { chord } : {}),
   };
 }

@@ -172,14 +172,25 @@ async function checkAttempt(deps: AppDeps, order: Order, attempt: PaymentAttempt
   db.exec("BEGIN IMMEDIATE");
   try {
     record.run(tx.status, tx.gatewayResponse ?? null, now, attempt.paystack_ref);
+    // notify_status is set in this same transaction so a restart can still find the order.
+    // The message itself is queued only after COMMIT, and a failure there cannot undo the payment.
     const { changes } = db
       .prepare(
-        "UPDATE orders SET status = 'paid', paid_at = ?, paid_reference = ? WHERE ref = ? AND status = 'pending_payment'",
+        `UPDATE orders SET status = 'paid', paid_at = ?, paid_reference = ?,
+                notify_status = CASE WHEN ? = 1 THEN 'pending' ELSE notify_status END
+         WHERE ref = ? AND status = 'pending_payment'`,
       )
-      .run(now, attempt.paystack_ref, order.ref);
+      .run(now, attempt.paystack_ref, deps.notifier ? 1 : 0, order.ref);
     db.exec("COMMIT");
     const claimed = Number(changes) === 1;
-    if (claimed) console.log(`[payments] ${order.ref} paid via ${attempt.paystack_ref}`);
+    if (claimed) {
+      console.log(`[payments] ${order.ref} paid via ${attempt.paystack_ref}`);
+      try {
+        deps.notifier?.enqueue(order.ref);
+      } catch (err) {
+        console.error(`[notify] ${order.ref} could not be queued`, err);
+      }
+    }
     return { kind: "paid", claimed };
   } catch (err) {
     db.exec("ROLLBACK");
