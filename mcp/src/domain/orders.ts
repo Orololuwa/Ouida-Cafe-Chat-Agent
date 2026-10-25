@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import type { Database } from "../db/index.js";
 import { catalogueIsEmpty, getCatalogue, getSettings } from "./menu.js";
-import { paymentConfirmedText, renderReceipt } from "./receipt.js";
+import { paymentConfirmedText, renderReceipt, SEND_MESSAGE, sendReceipt } from "./receipt.js";
 import type { CatalogueItem, Order, OrderLine, Plate } from "./types.js";
 
 // What the agent sends. Deliberately loose: every rule is checked here so problems come back
@@ -45,6 +45,7 @@ export type CreateOrderResult =
       plates: Plate[];
       drinks: OrderLine[];
       receipt_text: string;
+      send_to_customer: string;
       next_step?: string;
     }
   | {
@@ -53,6 +54,7 @@ export type CreateOrderResult =
       order_ref: string;
       customer_name: string;
       message_text: string;
+      send_to_customer: string;
       next_step: string;
     }
   | { status: "menu_not_set" }
@@ -234,9 +236,8 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
       order_ref: justPaid.ref,
       customer_name: justPaid.customer_name,
       message_text: paymentConfirmedText(justPaid),
-      next_step:
-        `Order ${justPaid.ref} is already paid. Send message_text to the customer as the entire reply. ` +
-        `Do not add anything before or after it, and do not call another tool.`,
+      send_to_customer: SEND_MESSAGE,
+      next_step: `Order ${justPaid.ref} is already paid. ${SEND_MESSAGE} Do not call another tool.`,
     };
   }
 
@@ -254,10 +255,11 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
       plates: existing.plates,
       drinks: existing.drinks,
       receipt_text: renderReceipt(existing),
+      send_to_customer: "Do not send the receipt again and do not apologise. Follow next_step.",
       next_step:
-        `This exact order already exists as ${existing.ref}. Do not send the receipt again. ` +
-        `If the customer just said yes, call create_payment_link with order_ref ${existing.ref} now and send only its message_text. ` +
-        `If the customer said paid, call verify_payment with order_ref ${existing.ref} now and send only its message_text. ` +
+        `This exact order already exists as ${existing.ref}. Do not send the receipt again and do not apologise. ` +
+        `If the customer just said yes, call create_payment_link with order_ref ${existing.ref} now. ${SEND_MESSAGE} ` +
+        `If the customer said paid, call verify_payment with order_ref ${existing.ref} now. ${SEND_MESSAGE} ` +
         `Do not call create_order again unless the customer changes the order.`,
     };
   }
@@ -275,6 +277,7 @@ export function createOrder(db: Database, input: CreateOrderInput, now: Date = n
     plates: order.plates,
     drinks: order.drinks,
     receipt_text: renderReceipt(order),
+    send_to_customer: sendReceipt(order.customer_name),
   };
 }
 

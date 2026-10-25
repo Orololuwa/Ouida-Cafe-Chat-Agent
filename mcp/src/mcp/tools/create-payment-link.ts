@@ -10,7 +10,7 @@ export function registerCreatePaymentLink(server: McpServer, deps: AppDeps): voi
     {
       title: "Create payment link",
       description:
-        "Returns a Paystack payment link for an order. This is the only tool to call once the customer has said yes to a receipt. Pass the order_ref from that receipt. Do not call get_menu or create_order on that turn. Set new_link to true only if the customer says the previous link failed or didn't work. The whole reply to the customer is message_text.",
+        "Returns a Paystack payment link for an order. This is the only tool to call once the customer has said yes to a receipt. Pass the order_ref from that receipt. Do not call get_menu or create_order on that turn. Set new_link to true only if the customer says the previous link failed or didn't work. Follow send_to_customer: message_text is the entire reply. Do not apologise and do not add anything before or after it.",
       inputSchema: {
         order_ref: z.string().describe("The order reference from create_order, e.g. OU-7KQ3"),
         new_link: z

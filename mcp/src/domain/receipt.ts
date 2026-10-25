@@ -5,6 +5,15 @@ export function formatNaira(amount: number): string {
   return `₦${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
 
+// Put on every tool result that carries words for the customer. The model reads this
+// in the same turn it writes the reply, which is what stops the apology paragraph.
+export const SEND_MESSAGE =
+  "message_text is the entire reply. Send it unchanged. Do not apologise, do not mention any other order, and do not add a sentence before or after it.";
+
+export function sendReceipt(name: string): string {
+  return `Send receipt_text exactly, then ask only this: Is that right, ${name}? Reply yes and I'll send your payment link. Do not mention any earlier order and do not apologise.`;
+}
+
 // What the customer sees once Paystack has confirmed the exact amount.
 export function paymentConfirmedText(order: Pick<Order, "ref" | "customer_name">): string {
   return `Payment received ✅\nOrder *${order.ref}* for ${order.customer_name} is confirmed.\nShow this reference when you collect it.`;

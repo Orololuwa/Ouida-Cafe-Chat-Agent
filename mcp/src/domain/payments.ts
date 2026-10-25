@@ -2,7 +2,7 @@ import type { Database } from "../db/index.js";
 import type { AppDeps } from "../deps.js";
 import { classifyStatus, type TransactionOutcome } from "../integrations/paystack.js";
 import { getOrder } from "./orders.js";
-import { formatNaira, paymentConfirmedText } from "./receipt.js";
+import { formatNaira, paymentConfirmedText, SEND_MESSAGE } from "./receipt.js";
 import type { Order, PaymentAttempt } from "./types.js";
 
 // At most 5 payment links per order. Attempts where Paystack never returned a link don't
@@ -18,6 +18,7 @@ interface PaidResult {
   paid_reference: string;
   amount_ngn: number;
   message_text: string;
+  send_to_customer: string;
 }
 interface LinkReady {
   status: "link_ready";
@@ -26,6 +27,7 @@ interface LinkReady {
   amount_ngn: number;
   payment_url: string;
   message_text: string;
+  send_to_customer: string;
 }
 type Bare<S extends string> = { status: S; order_ref: string };
 
@@ -44,6 +46,7 @@ export type VerifyPaymentResult =
       amount_ngn: number;
       payment_url: string;
       message_text: string;
+      send_to_customer: string;
     }
   | { status: "payment_failed"; order_ref: string; paystack_ref: string; reason: string }
   | Bare<"amount_mismatch" | "payment_reversed" | "no_payment_started" | "order_not_found" | "payment_check_failed">;
@@ -69,6 +72,7 @@ function paidResult(status: PaidResult["status"], order: Order): PaidResult {
     paid_reference: order.paid_reference ?? "",
     amount_ngn: order.total_ngn,
     message_text,
+    send_to_customer: SEND_MESSAGE,
   };
 }
 
@@ -232,6 +236,7 @@ export async function createPaymentLink(
         amount_ngn: amountNgn,
         payment_url: latest.authorization_url,
         message_text: linkMessage(orderRef, amountNgn, latest.authorization_url),
+        send_to_customer: SEND_MESSAGE,
       };
     }
   }
@@ -281,6 +286,7 @@ export async function createPaymentLink(
     amount_ngn: order.total_ngn,
     payment_url: init.authorizationUrl,
     message_text: linkMessage(orderRef, order.total_ngn, init.authorizationUrl),
+    send_to_customer: SEND_MESSAGE,
   };
 }
 
@@ -335,6 +341,7 @@ export async function verifyPayment(deps: AppDeps, inputRef: string): Promise<Ve
         amount_ngn: amountNgn,
         payment_url: url,
         message_text: notCompletedMessage(orderRef, amountNgn, url),
+        send_to_customer: SEND_MESSAGE,
       };
     case "reversed":
       return { status: "payment_reversed", order_ref: orderRef };

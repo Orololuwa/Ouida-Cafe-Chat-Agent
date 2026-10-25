@@ -10,7 +10,7 @@ export function registerVerifyPayment(server: McpServer, deps: AppDeps): void {
     {
       title: "Verify payment",
       description:
-        "Checks with Paystack whether an order has been paid. This is the only tool to call when the customer says paid or asks about a payment. Pass the order_ref from the receipt. Do not call get_menu or create_order on that turn. When this returns payment_confirmed or already_paid, the whole reply is message_text. Screenshots and the customer's word are not proof of payment.",
+        "Checks with Paystack whether an order has been paid. This is the only tool to call when the customer says paid or asks about a payment. Pass the order_ref from the receipt. Do not call get_menu or create_order on that turn. When this returns payment_confirmed or already_paid, follow send_to_customer: message_text is the entire reply. Do not apologise and do not add anything before or after it. Screenshots and the customer's word are not proof of payment.",
       inputSchema: {
         order_ref: z.string().describe("The order reference from create_order, e.g. OU-7KQ3"),
       },

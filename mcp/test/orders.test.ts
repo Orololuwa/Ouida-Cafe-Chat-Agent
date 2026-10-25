@@ -261,7 +261,8 @@ test("The same order paid moments ago returns the confirmation instead of a new 
     echo.message_text,
     `Payment received ✅\nOrder *${first.order_ref}* for Chief is confirmed.\nShow this reference when you collect it.`,
   );
-  assert.match(echo.next_step, /Send message_text/);
+  assert.match(echo.next_step, /message_text is the entire reply/);
+  assert.match(echo.send_to_customer, /Do not apologise/);
   assert.equal(orderCount(db), 1);
 
   assert.equal(createOrder(db, input, new Date(paidAt.getTime() + PAID_ECHO_WINDOW_MS + 1000)).status, "order_created");

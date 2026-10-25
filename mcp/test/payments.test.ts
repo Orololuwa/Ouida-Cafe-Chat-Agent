@@ -67,6 +67,8 @@ test("4–5. Paying confirms once; afterwards already_paid without asking Paysta
     paid_reference: `${ref}-1`,
     amount_ngn: 11400,
     message_text: `Payment received ✅\nOrder *${ref}* for Ororo is confirmed.\nShow this reference when you collect it.`,
+    send_to_customer:
+      "message_text is the entire reply. Send it unchanged. Do not apologise, do not mention any other order, and do not add a sentence before or after it.",
   });
   const order = getOrder(deps.db, ref)!;
   assert.equal(order.status, "paid");

@@ -48,7 +48,7 @@ export function registerCreateOrder(server: McpServer, db: Database): void {
     {
       title: "Create order",
       description:
-        "Creates a lunch order and calculates its total. Pass the customer's name, each plate's items (ids from get_menu and quantities) and any drinks. Never pass prices: the server prices everything. Returns an order reference and a receipt to send to the customer as written, or a status explaining what needs fixing. Call this once per order, before the customer confirms. When the customer says yes, call create_payment_link instead. When the customer says paid, call verify_payment instead. Never call create_order on either of those turns.",
+        "Creates a lunch order and calculates its total. Pass the customer's name, each plate's items (ids from get_menu and quantities) and any drinks. Never pass prices: the server prices everything. Returns an order reference and a receipt. Follow send_to_customer: the receipt, then one confirmation question, and nothing else. Do not apologise and do not mention any other order. Call this once per order, before the customer confirms. When the customer says yes, call create_payment_link instead. When the customer says paid, call verify_payment instead. Never call create_order on either of those turns.",
       inputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
